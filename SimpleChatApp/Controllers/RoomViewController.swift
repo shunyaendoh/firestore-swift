@@ -23,14 +23,26 @@ class RoomViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        let room1 = Room(name: "test", documentId: "123")
-        let room2 = Room(name: "test", documentId: "123")
-        
-        rooms.append(room1)
-        rooms.append(room2)
-        
         tableView.delegate = self
         tableView.dataSource = self
+        
+        let db = Firestore.firestore()
+        
+        db.collection("rooms").order(by: "createdAt", descending: true).addSnapshotListener({ (querySnapshot, error) in
+            guard let documents = querySnapshot?.documents else {
+                return
+            }
+            
+            var results: [Room] = []
+            
+            for document in documents {
+//                let name = document.data()["name"] as! String
+                let name = document.get("name") as! String
+                let room = Room(name: name, documentId: document.documentID)
+                results.append(room)
+            }
+            self.rooms = results
+        })
     }
 
     @IBAction func didClickButton(_ sender: UIButton) {
@@ -67,8 +79,21 @@ extension RoomViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
         cell.textLabel?.text = rooms[indexPath.row].name
+        cell.accessoryType = .disclosureIndicator
         return cell
     }
     
-    
+    func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+        if editingStyle == .delete {
+            let db = Firestore.firestore()
+
+            db.collection("rooms").document(rooms[indexPath.row].documentId).delete(){ err in
+                if let error = err {
+                    print(err.debugDescription)
+                } else {
+                    print("deleted")
+                }
+            }
+        }
+    }
 }
